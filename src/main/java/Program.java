@@ -5,9 +5,26 @@ import java.util.Random;
 public class Program {
     public static final Map<Integer, Integer> sizeToFreq = new HashMap<>();
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
+        Thread printThread = new Thread(() -> {
+            while (!Thread.currentThread().isInterrupted()) {
+                synchronized (sizeToFreq) {
+                    try {
+                        sizeToFreq.wait();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    Map.Entry<Integer, Integer> entry = sizeToFreq.entrySet()
+                            .stream()
+                            .max((e1, e2) -> e1.getValue().compareTo(e2.getValue())
+                            ).get();
+                    System.out.printf("Текущий максимум: %d (встретился %d раз)%n", entry.getKey(), entry.getValue());
+                }
+            }
+        });
+        printThread.start();
         for (int i = 0; i < 100; i++) {
-            new Thread(() -> {
+            Thread thread = new Thread(() -> {
                 String path = generateRoute("RLRFR", 100);
                 int countR = 0;
                 for (int j = 0; j < path.length(); j++) {
@@ -21,21 +38,13 @@ public class Program {
                     } else {
                         sizeToFreq.put(countR, sizeToFreq.get(countR) + 1);
                     }
+                    sizeToFreq.notify();
                 }
-            }).start();
+            });
+            thread.start();
+            thread.join();
         }
-        Map.Entry<Integer, Integer> entry = sizeToFreq.entrySet()
-                .stream()
-                .max((e1, e2) -> e1.getValue().compareTo(e2.getValue())
-                ).get();
-
-        System.out.println("Самое частое количество повторений " + entry.getKey() + " (встретилось " + entry.getValue() + " раз)");
-        System.out.println("Другие размеры:");
-        sizeToFreq.entrySet()
-                .stream()
-                .filter(e -> !e.getKey().equals(entry.getKey()))
-                .sorted((v1, v2) -> v1.getKey().compareTo(v2.getKey()))
-                .forEach(e -> System.out.printf(" - %d (%d раз)\n", e.getKey(), e.getValue()));
+        printThread.interrupt();
     }
 
     public static String generateRoute(String letters, int length) {
@@ -47,4 +56,3 @@ public class Program {
         return route.toString();
     }
 }
-
